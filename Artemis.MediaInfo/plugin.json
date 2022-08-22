@@ -1,0 +1,10 @@
+{
+	"API": "1.0",
+	"Author": "Aytackydln",
+	"Description": "Provides media info on a windows machine",
+	"Guid": "a2b4eb5c-4a5d-4eb8-88bf-c71b6f8e01ca",
+	"Main": "Artemis.MediaInfo.dll",
+	"Name": "Media Info",
+	"Repository": "https://github.com/Aytackydln/Artemis.MediaInfo",
+	"Version": "0.0.1.0"
+}
