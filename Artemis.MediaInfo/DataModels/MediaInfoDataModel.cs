@@ -1,4 +1,5 @@
-﻿using Artemis.Core;
+﻿using Windows.Media.Control;
+using Artemis.Core;
 using Artemis.Core.Modules;
 
 namespace Artemis.MediaInfo.DataModels
@@ -16,5 +17,10 @@ namespace Artemis.MediaInfo.DataModels
         
         [DataModelProperty(Name = "Previous media can be played")]
         public bool HasPreviousMedia { get; set; }
+        
+        [DataModelProperty(Name = "Latest updated media state",
+            Description = " Note that there may be other media sessions. " +
+                          "Other values become true when any of the sessions meet the conditions.")]
+        public GlobalSystemMediaTransportControlsSessionPlaybackStatus MediaState { get; set; }
     }
 }

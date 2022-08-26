@@ -11,25 +11,25 @@ namespace Artemis.MediaInfo
     [PluginFeature(Name = "MediaInfo")]
     public class MediaInfoModule : Module<MediaInfoDataModel>
     {
-        private readonly MediaManager _mediaManager = new();
+        private MediaManager _mediaManager;
 
         public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
 
-        private readonly List<string> _mediaSessions = new();
+        private List<string> _mediaSessions = new();
 
         public override void Enable()
         {
+            _mediaManager = new MediaManager();
             _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
             _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
             _mediaManager.OnAnyPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
 
             _mediaManager.Start();
-            while(!_mediaManager.IsStarted){}
-            
+
             DataModel.HasMedia = _mediaManager.CurrentMediaSessions.Count > 0;
 
             if (_mediaManager.CurrentMediaSessions.Count == 0) return;
-            
+            _mediaSessions = new List<string>(_mediaManager.CurrentMediaSessions.Select(pair => pair.Value.Id));
             
             DataModel.HasNextMedia = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
             DataModel.HasPreviousMedia = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsPreviousEnabled);
@@ -39,9 +39,16 @@ namespace Artemis.MediaInfo
 
         public override void Disable()
         {
+            foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
+            {
+                mediaSession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
+            }
+            
             _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
             _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
             _mediaManager.OnAnyPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
+            _mediaManager.Dispose();
+            _mediaManager = null;
         }
 
         public override void Update(double deltaTime)
@@ -59,19 +66,19 @@ namespace Artemis.MediaInfo
 
         }
 
-        private void MediaManager_OnSessionOpened(MediaManager.MediaSession mediasession)
+        private void MediaManager_OnSessionOpened(MediaManager.MediaSession mediaSession)
         {
             DataModel.HasMedia = true;
             
-            _mediaSessions.Add(mediasession.Id);
+            _mediaSessions.Add(mediaSession.Id);
 
-            mediasession.OnSessionClosed += MediaManager_OnAnySessionClosed;
+            mediaSession.OnSessionClosed += MediaManager_OnAnySessionClosed;
         }
 
-        private void MediaManager_OnAnySessionClosed(MediaManager.MediaSession mediasession)
+        private void MediaManager_OnAnySessionClosed(MediaManager.MediaSession mediaSession)
         {
-            mediasession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
-            _mediaSessions.Remove(mediasession.Id);
+            mediaSession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
+            _mediaSessions.Remove(mediaSession.Id);
 
             if (_mediaSessions.Count == 0)
             {
@@ -85,9 +92,11 @@ namespace Artemis.MediaInfo
             }
         }
 
-        private void MediaManager_OnAnyPlaybackStateChanged(MediaManager.MediaSession mediasession, GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackinfo)
+        private void MediaManager_OnAnyPlaybackStateChanged(MediaManager.MediaSession mediaSession,
+            GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
         {
             UpdateButtons();
+            DataModel.MediaState = playbackInfo.PlaybackStatus;
         }
 
         private void UpdateButtons()
