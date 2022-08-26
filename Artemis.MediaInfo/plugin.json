@@ -6,5 +6,6 @@
 	"Main": "Artemis.MediaInfo.dll",
 	"Name": "Media Info",
 	"Repository": "https://github.com/Aytackydln/Artemis.MediaInfo",
-	"Version": "0.0.2.0"
+	"Version": "0.0.2.0",
+	"Platforms":"Windows"
 }
