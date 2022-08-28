@@ -34,46 +34,27 @@ namespace Artemis.MediaInfo
         {
             _mediaManager = new MediaManager();
             _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
-            _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
-            _mediaManager.OnAnyPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
-            _mediaManager.OnAnyMediaPropertyChanged += _mediaManager_OnAnyMediaPropertyChanged;
 
             _mediaManager.Start();
 
-            DataModel.HasMedia = _mediaManager.CurrentMediaSessions.Count > 0;
+            var mediaExist = _mediaManager.CurrentMediaSessions.Count > 0;
+            DataModel.HasMedia = mediaExist;
 
-            if (_mediaManager.CurrentMediaSessions.Count == 0) return;
-            _mediaSessions = new List<string>(_mediaManager.CurrentMediaSessions.Select(pair => pair.Value.Id));
+            _mediaSessions = new List<string>();
+            if (!mediaExist) return;
+
+            foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
+            {
+                _mediaSessions.Add(mediaSession.Id);
+                mediaSession.OnMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
+                mediaSession.OnPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
+                mediaSession.OnSessionClosed += MediaManager_OnAnySessionClosed;
+            }
             
             DataModel.HasNextMedia = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
             DataModel.HasPreviousMedia = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsPreviousEnabled);
             DataModel.MediaPlaying = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().PlaybackStatus ==
-                                                                         GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
-        }
-
-        private async void _mediaManager_OnAnyMediaPropertyChanged(MediaManager.MediaSession mediaSession, GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
-        {
-            try
-            {
-                if (mediaProperties.Thumbnail is null)
-                    return;
-
-                var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
-                var fileBytes = new byte[imageStream.Size];
-
-                using DataReader reader = new DataReader(imageStream);
-                await reader.LoadAsync((uint)imageStream.Size);
-                reader.ReadBytes(fileBytes);
-
-                using SKBitmap skbm = SKBitmap.Decode(fileBytes);
-                SKColor[] skClrs = _colorQuantizer.Quantize(skbm.Pixels, 256);
-                DataModel.ArtColors =  _colorQuantizer.FindAllColorVariations(skClrs, true);
-            }
-            catch (System.Exception e)
-            {
-
-            }
-
+                GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
         }
 
         public override void Disable()
@@ -84,9 +65,6 @@ namespace Artemis.MediaInfo
             }
             
             _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
-            _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
-            _mediaManager.OnAnyPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
-            _mediaManager.OnAnyMediaPropertyChanged -= _mediaManager_OnAnyMediaPropertyChanged;
             _mediaManager.Dispose();
             _mediaManager = null;
         }
@@ -112,11 +90,15 @@ namespace Artemis.MediaInfo
             
             _mediaSessions.Add(mediaSession.Id);
 
+            mediaSession.OnMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
+            mediaSession.OnPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
             mediaSession.OnSessionClosed += MediaManager_OnAnySessionClosed;
         }
 
         private void MediaManager_OnAnySessionClosed(MediaManager.MediaSession mediaSession)
         {
+            mediaSession.OnMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
+            mediaSession.OnPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
             mediaSession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
             _mediaSessions.Remove(mediaSession.Id);
 
@@ -129,6 +111,34 @@ namespace Artemis.MediaInfo
             else
             {
                 UpdateButtons();
+            }
+        }
+
+        private async void MediaManager_OnAnyMediaPropertyChanged(MediaManager.MediaSession mediaSession, GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+        {
+            try
+            {
+                if (mediaProperties.Thumbnail is null)
+                {
+                    DataModel.HasArt = false;
+                    return;
+                }
+
+                var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
+                var fileBytes = new byte[imageStream.Size];
+
+                using DataReader reader = new DataReader(imageStream);
+                await reader.LoadAsync((uint)imageStream.Size);
+                reader.ReadBytes(fileBytes);
+
+                using SKBitmap skbm = SKBitmap.Decode(fileBytes);
+                SKColor[] skClrs = _colorQuantizer.Quantize(skbm.Pixels, 256);
+                DataModel.ArtColors =  _colorQuantizer.FindAllColorVariations(skClrs, true);
+                DataModel.HasArt = true;
+            }
+            catch
+            {
+                DataModel.HasArt = false;
             }
         }
 

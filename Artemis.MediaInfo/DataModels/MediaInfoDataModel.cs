@@ -23,6 +23,11 @@ namespace Artemis.MediaInfo.DataModels
             Description = " Note that there may be other media sessions. " +
                           "Other values become true when any of the sessions meet the conditions.")]
         public GlobalSystemMediaTransportControlsSessionPlaybackStatus MediaState { get; set; }
+        
+        
+        [DataModelProperty(Name = "Has Art",
+            Description = "If the media app provided an art.")]
+        public bool HasArt { get; set; }
 
         public ColorSwatch ArtColors { get; set; }
     }
