@@ -23,7 +23,7 @@ namespace Artemis.MediaInfo
 
         public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
 
-        private List<string> _mediaSessions = new();
+        private List<MediaManager.MediaSession> _mediaSessions = new();
 
         public MediaInfoModule(IColorQuantizerService colorQuantizerService)
         {
@@ -34,21 +34,21 @@ namespace Artemis.MediaInfo
         {
             _mediaManager = new MediaManager();
             _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
+            _mediaManager.OnAnyMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
+            _mediaManager.OnAnyPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
+            _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
 
             _mediaManager.Start();
 
             var mediaExist = _mediaManager.CurrentMediaSessions.Count > 0;
             DataModel.HasMedia = mediaExist;
 
-            _mediaSessions = new List<string>();
+            _mediaSessions = new List<MediaManager.MediaSession>();
             if (!mediaExist) return;
 
             foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
             {
-                _mediaSessions.Add(mediaSession.Id);
-                mediaSession.OnMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
-                mediaSession.OnPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
-                mediaSession.OnSessionClosed += MediaManager_OnAnySessionClosed;
+                ListenSession(mediaSession);
             }
             
             DataModel.HasNextMedia = _mediaManager.CurrentMediaSessions.Any(pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
@@ -61,10 +61,13 @@ namespace Artemis.MediaInfo
         {
             foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
             {
-                mediaSession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
+                _mediaSessions.Remove(mediaSession);
             }
             
             _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
+            _mediaManager.OnAnyMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
+            _mediaManager.OnAnyPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
+            _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
             _mediaManager.Dispose();
             _mediaManager = null;
         }
@@ -87,12 +90,12 @@ namespace Artemis.MediaInfo
         private void MediaManager_OnSessionOpened(MediaManager.MediaSession mediaSession)
         {
             DataModel.HasMedia = true;
-            
-            _mediaSessions.Add(mediaSession.Id);
+            ListenSession(mediaSession);
+        }
 
-            mediaSession.OnMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
-            mediaSession.OnPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
-            mediaSession.OnSessionClosed += MediaManager_OnAnySessionClosed;
+        private void ListenSession(MediaManager.MediaSession mediaSession)
+        {
+            _mediaSessions.Add(mediaSession);
         }
 
         private void MediaManager_OnAnySessionClosed(MediaManager.MediaSession mediaSession)
@@ -100,7 +103,7 @@ namespace Artemis.MediaInfo
             mediaSession.OnMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
             mediaSession.OnPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
             mediaSession.OnSessionClosed -= MediaManager_OnAnySessionClosed;
-            _mediaSessions.Remove(mediaSession.Id);
+            _mediaSessions.Remove(mediaSession);
 
             if (_mediaSessions.Count == 0)
             {
@@ -151,12 +154,12 @@ namespace Artemis.MediaInfo
 
         private void UpdateButtons()
         {
-            DataModel.HasNextMedia = _mediaManager.CurrentMediaSessions.Any(
-                pair => pair.Value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
-            DataModel.HasPreviousMedia = _mediaManager.CurrentMediaSessions.Any(pair =>
-                pair.Value.ControlSession.GetPlaybackInfo().Controls.IsPreviousEnabled);
-            DataModel.MediaPlaying = _mediaManager.CurrentMediaSessions.Any(pair =>
-                pair.Value.ControlSession.GetPlaybackInfo().PlaybackStatus ==
+            DataModel.HasNextMedia = _mediaSessions.Any(
+                value => value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
+            DataModel.HasPreviousMedia = _mediaManager.CurrentMediaSessions.Any(value =>
+                value.Value.ControlSession.GetPlaybackInfo().Controls.IsPreviousEnabled);
+            DataModel.MediaPlaying = _mediaManager.CurrentMediaSessions.Any(value =>
+                value.Value.ControlSession.GetPlaybackInfo().PlaybackStatus ==
                 GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
         }
     }
