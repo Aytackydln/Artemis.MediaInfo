@@ -1,6 +1,7 @@
 ﻿using Windows.Media.Control;
 using Artemis.Core;
 using Artemis.Core.Modules;
+using Artemis.Core.Services;
 
 namespace Artemis.MediaInfo.DataModels
 {
@@ -22,5 +23,7 @@ namespace Artemis.MediaInfo.DataModels
             Description = " Note that there may be other media sessions. " +
                           "Other values become true when any of the sessions meet the conditions.")]
         public GlobalSystemMediaTransportControlsSessionPlaybackStatus MediaState { get; set; }
+
+        public ColorSwatch ArtColors { get; set; }
     }
 }
