@@ -50,6 +50,8 @@ namespace Artemis.MediaInfo
             {
                 _mediaSessions.Add(mediaSession);
             }
+
+            DataModel.MediaSessions = _mediaSessions;   //debug
             
             UpdateButtons();
         }
@@ -124,6 +126,8 @@ namespace Artemis.MediaInfo
             catch
             {
                 DataModel.HasArt = false;
+                _albumArtSessions.Remove(mediaSession);
+                DataModel.HasArt = _albumArtSessions.Count > 0;
             }
         }
 
@@ -136,6 +140,7 @@ namespace Artemis.MediaInfo
 
         private void UpdateButtons()
         {
+            DataModel.HasMedia = _mediaSessions.Count > 0;
             DataModel.HasNextMedia = _mediaSessions.Any(
                 value => value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
             DataModel.HasPreviousMedia = _mediaSessions.Any(value =>

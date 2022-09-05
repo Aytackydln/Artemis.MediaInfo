@@ -1,8 +1,10 @@
-﻿using Windows.Media;
+﻿using System.Collections.Generic;
+using Windows.Media;
 using Windows.Media.Control;
 using Artemis.Core;
 using Artemis.Core.Modules;
 using Artemis.Core.Services;
+using WindowsMediaController;
 
 namespace Artemis.MediaInfo.DataModels
 {
@@ -33,6 +35,7 @@ namespace Artemis.MediaInfo.DataModels
         public ColorSwatch ArtColors { get; set; }
 
         public DataModelEvent<MediaChangedEventArgs> MediaChanged { get; } = new();
+        public HashSet<MediaManager.MediaSession> MediaSessions { get; set; }
     }
 
     public class MediaChangedEventArgs : DataModelEventArgs
