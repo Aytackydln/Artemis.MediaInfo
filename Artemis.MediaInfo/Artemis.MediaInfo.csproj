@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Dubya.WindowsMediaController" Version="2.1.0" >
+    <Reference Include="Dubya.WindowsMediaController" Version="2.1.0">
       <HintPath>.\WindowsMediaController.dll</HintPath>
       <Private>true</Private>
     </Reference>

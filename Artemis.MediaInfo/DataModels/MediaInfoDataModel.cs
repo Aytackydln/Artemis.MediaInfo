@@ -1,4 +1,5 @@
-﻿using Windows.Media.Control;
+﻿using Windows.Media;
+using Windows.Media.Control;
 using Artemis.Core;
 using Artemis.Core.Modules;
 using Artemis.Core.Services;
@@ -30,5 +31,16 @@ namespace Artemis.MediaInfo.DataModels
         public bool HasArt { get; set; }
 
         public ColorSwatch ArtColors { get; set; }
+
+        public DataModelEvent<MediaChangedEventArgs> MediaChanged { get; } = new();
+    }
+
+    public class MediaChangedEventArgs : DataModelEventArgs
+    {
+        public string SessionId { get; set; }
+        public string Title { get; set; }
+        public string Artist { get; set; }
+        public MediaPlaybackType MediaType { get; set; }
+        public bool HasArt { get; set; }
     }
 }
