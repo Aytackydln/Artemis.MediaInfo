@@ -5,14 +5,13 @@ using System.Linq;
 using Artemis.MediaInfo.DataModels;
 using WindowsMediaController;
 using System;
-using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
 using Windows.Media;
 using Windows.Storage.Streams;
 using SkiaSharp;
 using Artemis.Core.Services;
 using Windows.Media.Control;
+using static WindowsMediaController.MediaManager;
 
 namespace Artemis.MediaInfo
 {
@@ -24,8 +23,8 @@ namespace Artemis.MediaInfo
 
         public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
 
-        private readonly HashSet<MediaManager.MediaSession> _mediaSessions = new(new MediaSessionComparer());
-        private readonly HashSet<MediaManager.MediaSession> _albumArtSessions = new(new MediaSessionComparer());
+        private readonly HashSet<MediaSession> _mediaSessions = new(new MediaSessionComparer());
+        private readonly HashSet<MediaSession> _albumArtSessions = new(new MediaSessionComparer());
 
         public MediaInfoModule(IColorQuantizerService colorQuantizerService)
         {
@@ -46,9 +45,17 @@ namespace Artemis.MediaInfo
             if (!DataModel.HasMedia) return;
 
             _mediaSessions.Clear();
+            _albumArtSessions.Clear();
             foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
             {
                 _mediaSessions.Add(mediaSession);
+                mediaSession.ControlSession.TryGetMediaPropertiesAsync().AsTask().ContinueWith(task =>
+                {
+                    if (task.Result.Thumbnail != null)
+                    {
+                        _albumArtSessions.Add(mediaSession);
+                    }
+                });
             }
 
             DataModel.MediaSessions = _mediaSessions;   //debug
@@ -75,13 +82,15 @@ namespace Artemis.MediaInfo
         public override void ModuleActivated(bool isOverride) {}
         public override void ModuleDeactivated(bool isOverride) {}
 
-        private void MediaManager_OnSessionOpened(MediaManager.MediaSession mediaSession)
+        private void MediaManager_OnSessionOpened(MediaSession mediaSession)
         {
             DataModel.HasMedia = true;
             _mediaSessions.Add(mediaSession);
+
+            UpdateButtons();
         }
 
-        private void MediaManager_OnAnySessionClosed(MediaManager.MediaSession mediaSession)
+        private void MediaManager_OnAnySessionClosed(MediaSession mediaSession)
         {
             _mediaSessions.Remove(mediaSession);
             _albumArtSessions.Remove(mediaSession);
@@ -89,7 +98,7 @@ namespace Artemis.MediaInfo
             UpdateButtons();
         }
 
-        private async void MediaManager_OnAnyMediaPropertyChanged(MediaManager.MediaSession mediaSession,
+        private async void MediaManager_OnAnyMediaPropertyChanged(MediaSession mediaSession,
             GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
         {
             DataModel.MediaChanged.Trigger(new MediaChangedEventArgs
@@ -110,16 +119,7 @@ namespace Artemis.MediaInfo
                     return;
                 }
 
-                var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
-                var fileBytes = new byte[imageStream.Size];
-
-                using DataReader reader = new DataReader(imageStream);
-                await reader.LoadAsync((uint)imageStream.Size);
-                reader.ReadBytes(fileBytes);
-
-                using SKBitmap skbm = SKBitmap.Decode(fileBytes);
-                SKColor[] skClrs = _colorQuantizer.Quantize(skbm.Pixels, 256);
-                DataModel.ArtColors =  _colorQuantizer.FindAllColorVariations(skClrs, true);
+                DataModel.ArtColors = await ReadMediaColors(mediaProperties);
                 DataModel.HasArt = true;
                 _albumArtSessions.Add(mediaSession);
             }
@@ -131,7 +131,23 @@ namespace Artemis.MediaInfo
             }
         }
 
-        private void MediaManager_OnAnyPlaybackStateChanged(MediaManager.MediaSession mediaSession,
+        private async Task<ColorSwatch> ReadMediaColors(GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+        {
+            var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
+            var fileBytes = new byte[imageStream.Size];
+
+            using (var reader = new DataReader(imageStream))
+            {
+                await reader.LoadAsync((uint)imageStream.Size);
+                reader.ReadBytes(fileBytes);
+            }
+
+            using SKBitmap bitmap = SKBitmap.Decode(fileBytes);
+            SKColor[] skClrs = _colorQuantizer.Quantize(bitmap.Pixels, 256);
+            return _colorQuantizer.FindAllColorVariations(skClrs, true);;
+        }
+
+        private void MediaManager_OnAnyPlaybackStateChanged(MediaSession mediaSession,
             GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
         {
             UpdateButtons();
@@ -151,14 +167,14 @@ namespace Artemis.MediaInfo
             DataModel.HasArt = _albumArtSessions.Count > 0;
         }
 
-        private class MediaSessionComparer : IEqualityComparer<MediaManager.MediaSession>
+        private class MediaSessionComparer : IEqualityComparer<MediaSession>
         {
-            public bool Equals(MediaManager.MediaSession x, MediaManager.MediaSession y)
+            public bool Equals(MediaSession x, MediaSession y)
             {
                 return x?.Id == y?.Id;
             }
 
-            public int GetHashCode(MediaManager.MediaSession obj)
+            public int GetHashCode(MediaSession obj)
             {
                 return obj.Id.GetHashCode();
             }
