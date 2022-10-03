@@ -152,6 +152,9 @@ namespace Artemis.MediaInfo
         {
             UpdateButtons();
             DataModel.MediaState = playbackInfo.PlaybackStatus;
+            _mediaSessions.Add(mediaSession);
+
+            UpdateButtons();
         }
 
         private void UpdateButtons()
