@@ -4,103 +4,127 @@ using System.Collections.Generic;
 using System.Linq;
 using Artemis.MediaInfo.DataModels;
 using WindowsMediaController;
-using System;
-using System.Threading.Tasks;
 using Windows.Media;
-using Windows.Storage.Streams;
-using SkiaSharp;
-using Artemis.Core.Services;
 using Windows.Media.Control;
+using Artemis.Core.Properties;
 using static WindowsMediaController.MediaManager;
+using static Artemis.MediaInfo.MediaInfoHelper;
 
-namespace Artemis.MediaInfo
+namespace Artemis.MediaInfo;
+
+[PluginFeature(Name = "MediaInfo")]
+public class MediaInfoModule : Module<MediaInfoDataModel>
 {
-    [PluginFeature(Name = "MediaInfo")]
-    public class MediaInfoModule : Module<MediaInfoDataModel>
+    private MediaManager _mediaManager;
+
+    public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
+
+    private readonly HashSet<MediaSession> _mediaSessions = new(new MediaSessionComparer());
+    private readonly HashSet<MediaSession> _albumArtSessions = new(new MediaSessionComparer());
+
+    [CanBeNull]
+    private MediaSession _currentSession;
+
+    public override void Enable()
     {
-        private readonly IColorQuantizerService _colorQuantizer;
-        private MediaManager _mediaManager;
+        _mediaSessions.Clear();
+        _albumArtSessions.Clear();
 
-        public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
+        _mediaManager = new MediaManager();
+        _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
+        _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
+        _mediaManager.OnFocusedSessionChanged += MediaManagerOnOnFocusedSessionChanged;
+        _mediaManager.OnAnyMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;  //listen for media arts
 
-        private readonly HashSet<MediaSession> _mediaSessions = new(new MediaSessionComparer());
-        private readonly HashSet<MediaSession> _albumArtSessions = new(new MediaSessionComparer());
+        _mediaManager.Start();
 
-        public MediaInfoModule(IColorQuantizerService colorQuantizerService)
+        foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
         {
-            _colorQuantizer = colorQuantizerService;
-        }
-
-        public override void Enable()
-        {
-            _mediaManager = new MediaManager();
-            _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
-            _mediaManager.OnAnyPlaybackStateChanged += MediaManager_OnAnyPlaybackStateChanged;
-            _mediaManager.OnAnyMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;
-            _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
-
-            _mediaManager.Start();
-
-            DataModel.HasMedia = _mediaManager.CurrentMediaSessions.Count > 0;
-            if (!DataModel.HasMedia) return;
-
-            _mediaSessions.Clear();
-            _albumArtSessions.Clear();
-            foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
-            {
-                _mediaSessions.Add(mediaSession);
-                mediaSession.ControlSession.TryGetMediaPropertiesAsync().AsTask().ContinueWith(task =>
-                {
-                    if (task.Result.Thumbnail != null)
-                    {
-                        _albumArtSessions.Add(mediaSession);
-                    }
-                });
-            }
-
-            DataModel.MediaSessions = _mediaSessions;   //debug
-            
-            UpdateButtons();
-        }
-
-        public override void Disable()
-        {
-            foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
-            {
-                _mediaSessions.Remove(mediaSession);
-            }
-            
-            _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
-            _mediaManager.OnAnyPlaybackStateChanged -= MediaManager_OnAnyPlaybackStateChanged;
-            _mediaManager.OnAnyMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
-            _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
-            _mediaManager.Dispose();
-            _mediaManager = null;
-        }
-
-        public override void Update(double deltaTime) {}
-        public override void ModuleActivated(bool isOverride) {}
-        public override void ModuleDeactivated(bool isOverride) {}
-
-        private void MediaManager_OnSessionOpened(MediaSession mediaSession)
-        {
-            DataModel.HasMedia = true;
             _mediaSessions.Add(mediaSession);
+        }
+    }
 
-            UpdateButtons();
+    private void MediaManagerOnOnFocusedSessionChanged(MediaSession mediaSession)
+    {
+        if (_currentSession != null)
+        {
+            _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
+        }
+        _mediaSessions.Add(mediaSession);
+        _currentSession = mediaSession;
+        _mediaManager.OnAnyPlaybackStateChanged += MediaSession_OnPlaybackStateChanged;
+        MediaSession_OnPlaybackStateChanged(mediaSession, mediaSession.ControlSession.GetPlaybackInfo());
+    }
+
+    public override void Disable()
+    {
+        _albumArtSessions.Clear();
+        _mediaSessions.Clear();
+
+        if (_currentSession != null)
+        {
+            _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
         }
 
-        private void MediaManager_OnAnySessionClosed(MediaSession mediaSession)
+        _mediaManager.OnAnyMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
+        _mediaManager.OnFocusedSessionChanged -= MediaManagerOnOnFocusedSessionChanged;
+        _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
+        _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
+        _mediaManager.Dispose();
+        _mediaManager = null;
+    }
+
+    public override void Update(double deltaTime) {}
+
+    public override void ModuleActivated(bool isOverride)
+    {
+        DataModel.MediaSessions = _mediaSessions;
+    }
+    public override void ModuleDeactivated(bool isOverride) {
+        //unused
+    }
+
+    private void MediaManager_OnSessionOpened(MediaSession mediaSession)
+    {
+        DataModel.HasMedia = true;
+        _mediaSessions.Add(mediaSession);
+    }
+
+    private void MediaManager_OnAnySessionClosed(MediaSession mediaSession)
+    {
+        _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
+        _mediaSessions.Remove(mediaSession);
+        _albumArtSessions.Remove(mediaSession);
+        if (_currentSession.Id == mediaSession.Id)
         {
-            _mediaSessions.Remove(mediaSession);
+            _currentSession = _mediaSessions.First();
+        }
+        DataModel.HasMedia = _mediaSessions.Count > 0;
+        UpdateButtons(_currentSession);
+        UpdateArtState();
+    }
+
+    private async void MediaManager_OnAnyMediaPropertyChanged(MediaSession mediaSession,
+        GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+    {
+        try
+        {
+            if (mediaProperties.Thumbnail is null)
+            {
+                _albumArtSessions.Remove(mediaSession);
+                return;
+            }
+
+            DataModel.ArtColors = await ReadMediaColors(mediaProperties);
+            _albumArtSessions.Add(mediaSession);
+        }
+        catch
+        {
             _albumArtSessions.Remove(mediaSession);
-
-            UpdateButtons();
         }
-
-        private async void MediaManager_OnAnyMediaPropertyChanged(MediaSession mediaSession,
-            GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+        finally
         {
+            UpdateArtState();
             DataModel.MediaChanged.Trigger(new MediaChangedEventArgs
             {
                 SessionId = mediaSession.Id,
@@ -109,78 +133,62 @@ namespace Artemis.MediaInfo
                 MediaType = mediaProperties.PlaybackType ?? MediaPlaybackType.Unknown,
                 HasArt = mediaProperties.Thumbnail is not null
             });
-            
-            try
-            {
-                if (mediaProperties.Thumbnail is null)
-                {
-                    _albumArtSessions.Remove(mediaSession);
-                    DataModel.HasArt = _albumArtSessions.Count > 0;
-                    return;
-                }
+        }
+    }
 
-                DataModel.ArtColors = await ReadMediaColors(mediaProperties);
-                DataModel.HasArt = true;
-                _albumArtSessions.Add(mediaSession);
-            }
-            catch
-            {
-                DataModel.HasArt = false;
-                _albumArtSessions.Remove(mediaSession);
-                DataModel.HasArt = _albumArtSessions.Count > 0;
-            }
+    private void MediaSession_OnPlaybackStateChanged(MediaSession mediaSession,
+        GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
+    {
+        if (playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed)
+        {
+            return;
         }
 
-        private async Task<ColorSwatch> ReadMediaColors(GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+        _mediaSessions.Add(mediaSession);   // Some app like chrome use same id for different tabs.
+                                            // So, closing the tab may cause all chroma sessions to be removed. This re-adds them
+
+        UpdateButtons(mediaSession);
+        UpdateArtState();
+    }
+
+    private void UpdateButtons(MediaSession mediaSession)
+    {
+        if (mediaSession == null)
         {
-            var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
-            var fileBytes = new byte[imageStream.Size];
+            DataModel.HasMedia = false;
+            DataModel.HasNextMedia = false;
+            DataModel.HasPreviousMedia = false;
+            DataModel.MediaPlaying = false;
+            DataModel.MediaState = GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed;
+            DataModel.SessionName = "";
+            return;
+        }
+        DataModel.HasMedia = true;
 
-            using (var reader = new DataReader(imageStream))
-            {
-                await reader.LoadAsync((uint)imageStream.Size);
-                reader.ReadBytes(fileBytes);
-            }
+        var playbackInfo = mediaSession.ControlSession.GetPlaybackInfo();
+        var playbackControls = playbackInfo.Controls;
+        DataModel.HasNextMedia = playbackControls.IsNextEnabled;
+        DataModel.HasPreviousMedia = playbackControls.IsPreviousEnabled;
+        DataModel.MediaPlaying = playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+        DataModel.MediaState = playbackInfo.PlaybackStatus;
+        DataModel.SessionName = mediaSession.Id;
+    }
 
-            using SKBitmap bitmap = SKBitmap.Decode(fileBytes);
-            SKColor[] skClrs = _colorQuantizer.Quantize(bitmap.Pixels, 256);
-            return _colorQuantizer.FindAllColorVariations(skClrs, true);;
+    private void UpdateArtState()
+    {
+        DataModel.HasArt = _albumArtSessions.Count > 0;
+    }
+
+    private sealed class MediaSessionComparer : IEqualityComparer<MediaSession>
+    {
+        public bool Equals(MediaSession x, MediaSession y)
+        {
+            return x?.Id == y?.Id;
         }
 
-        private void MediaManager_OnAnyPlaybackStateChanged(MediaSession mediaSession,
-            GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
+        public int GetHashCode(MediaSession obj)
         {
-            UpdateButtons();
-            DataModel.MediaState = playbackInfo.PlaybackStatus;
-            _mediaSessions.Add(mediaSession);
-
-            UpdateButtons();
-        }
-
-        private void UpdateButtons()
-        {
-            DataModel.HasMedia = _mediaSessions.Count > 0;
-            DataModel.HasNextMedia = _mediaSessions.Any(
-                value => value.ControlSession.GetPlaybackInfo().Controls.IsNextEnabled);
-            DataModel.HasPreviousMedia = _mediaSessions.Any(value =>
-                value.ControlSession.GetPlaybackInfo().Controls.IsPreviousEnabled);
-            DataModel.MediaPlaying = _mediaSessions.Any(value =>
-                value.ControlSession.GetPlaybackInfo().PlaybackStatus ==
-                GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing);
-            DataModel.HasArt = _albumArtSessions.Count > 0;
-        }
-
-        private class MediaSessionComparer : IEqualityComparer<MediaSession>
-        {
-            public bool Equals(MediaSession x, MediaSession y)
-            {
-                return x?.Id == y?.Id;
-            }
-
-            public int GetHashCode(MediaSession obj)
-            {
-                return obj.Id.GetHashCode();
-            }
+            return obj.Id.GetHashCode();
         }
     }
 }
