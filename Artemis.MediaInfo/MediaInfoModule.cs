@@ -79,6 +79,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
     public override void ModuleActivated(bool isOverride)
     {
         DataModel.MediaSessions = _mediaSessions;
+        DataModel.ArtMediaSessions = _albumArtSessions;
     }
     public override void ModuleDeactivated(bool isOverride) {
         //unused
@@ -99,7 +100,6 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         {
             _currentSession = _mediaSessions.First();
         }
-        DataModel.HasMedia = _mediaSessions.Count > 0;
         UpdateButtons(_currentSession);
         UpdateArtState();
     }
@@ -139,7 +139,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
     private void MediaSession_OnPlaybackStateChanged(MediaSession mediaSession,
         GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
     {
-        if (playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed)
+        if (playbackInfo == null || playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed)
         {
             return;
         }
@@ -176,7 +176,8 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
 
     private void UpdateArtState()
     {
-        DataModel.HasArt = _albumArtSessions.Count > 0;
+        _albumArtSessions.TrimExcess();
+        DataModel.HasArt = _albumArtSessions.Any();
     }
 
     private sealed class MediaSessionComparer : IEqualityComparer<MediaSession>
