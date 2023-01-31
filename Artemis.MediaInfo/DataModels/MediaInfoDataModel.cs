@@ -37,8 +37,8 @@ public class MediaInfoDataModel : DataModel
     public string SessionName { get; set; }
 
     public DataModelEvent<MediaChangedEventArgs> MediaChanged { get; } = new();
-    public HashSet<MediaManager.MediaSession> MediaSessions { get; set; }
-    public HashSet<MediaManager.MediaSession> ArtMediaSessions { get; set; }
+    public ISet<MediaManager.MediaSession> MediaSessions { get; set; }
+    public ISet<MediaManager.MediaSession> ArtMediaSessions { get; set; }
 }
 
 public class MediaChangedEventArgs : DataModelEventArgs

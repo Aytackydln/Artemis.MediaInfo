@@ -19,8 +19,8 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
 
     public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
 
-    private readonly HashSet<MediaSession> _mediaSessions = new(new MediaSessionComparer());
-    private readonly HashSet<MediaSession> _albumArtSessions = new(new MediaSessionComparer());
+    private readonly ISet<MediaSession> _mediaSessions = new HashSet<MediaSession>(new MediaSessionComparer());
+    private readonly ISet<MediaSession> _albumArtSessions = new HashSet<MediaSession>(new MediaSessionComparer());
 
     [CanBeNull]
     private MediaSession _currentSession;
@@ -98,7 +98,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         _albumArtSessions.Remove(mediaSession);
         if (_currentSession.Id == mediaSession.Id)
         {
-            _currentSession = _mediaSessions.First();
+            _currentSession = _mediaManager.GetFocusedSession();
         }
         UpdateButtons(_currentSession);
         UpdateArtState();
@@ -107,6 +107,11 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
     private async void MediaManager_OnAnyMediaPropertyChanged(MediaSession mediaSession,
         GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
     {
+        if (mediaSession.ControlSession == null)
+        {
+            MediaManager_OnAnySessionClosed(mediaSession);
+            return;
+        }
         try
         {
             if (mediaProperties.Thumbnail is null)
@@ -141,6 +146,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
     {
         if (playbackInfo == null || playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed)
         {
+            MediaManager_OnAnySessionClosed(mediaSession);
             return;
         }
 
@@ -176,7 +182,6 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
 
     private void UpdateArtState()
     {
-        _albumArtSessions.TrimExcess();
         DataModel.HasArt = _albumArtSessions.Any();
     }
 
