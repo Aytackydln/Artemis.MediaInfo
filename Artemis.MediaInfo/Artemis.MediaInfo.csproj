@@ -4,6 +4,7 @@
         <Platforms>x64</Platforms>
         <PlatformTarget>x64</PlatformTarget>
         <IncludeBuildOutput>false</IncludeBuildOutput>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>

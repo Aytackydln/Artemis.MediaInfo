@@ -11,7 +11,12 @@ public static class MediaInfoHelper
 {
     internal static async Task<ColorSwatch> ReadMediaColors(GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
     {
-        var imageStream = await mediaProperties.Thumbnail.OpenReadAsync();
+        return await ReadMediaColors(mediaProperties.Thumbnail);
+    }
+
+    internal static async Task<ColorSwatch> ReadMediaColors(IRandomAccessStreamReference thumbnail)
+    {
+        var imageStream = await thumbnail.OpenReadAsync();
         var fileBytes = new byte[imageStream.Size];
 
         using (var reader = new DataReader(imageStream))

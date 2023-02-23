@@ -1,12 +1,11 @@
-﻿using Artemis.Core;
+﻿using System;
+using Artemis.Core;
 using Artemis.Core.Modules;
 using System.Collections.Generic;
 using System.Linq;
 using Artemis.MediaInfo.DataModels;
-using WindowsMediaController;
-using Windows.Media;
 using Windows.Media.Control;
-using Artemis.Core.Properties;
+using Artemis.MediaInfo.MediaWatch;
 using static WindowsMediaController.MediaManager;
 using static Artemis.MediaInfo.MediaInfoHelper;
 
@@ -15,149 +14,45 @@ namespace Artemis.MediaInfo;
 [PluginFeature(Name = "MediaInfo")]
 public class MediaInfoModule : Module<MediaInfoDataModel>
 {
-    private MediaManager _mediaManager;
+    private static readonly bool FocusedUpdate = false;   //because window's focus events don't work well for everyone :/
 
     public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
 
-    private readonly ISet<MediaSession> _mediaSessions = new HashSet<MediaSession>(new MediaSessionComparer());
-    private readonly ISet<MediaSession> _albumArtSessions = new HashSet<MediaSession>(new MediaSessionComparer());
-
-    [CanBeNull]
-    private MediaSession _currentSession;
+    private readonly MediaWatcher _mediaWatcher = new();
 
     public override void Enable()
     {
-        _mediaSessions.Clear();
-        _albumArtSessions.Clear();
-
-        _mediaManager = new MediaManager();
-        _mediaManager.OnAnySessionOpened += MediaManager_OnSessionOpened;
-        _mediaManager.OnAnySessionClosed += MediaManager_OnAnySessionClosed;
-        _mediaManager.OnFocusedSessionChanged += MediaManagerOnOnFocusedSessionChanged;
-        _mediaManager.OnAnyMediaPropertyChanged += MediaManager_OnAnyMediaPropertyChanged;  //listen for media arts
-
-        _mediaManager.Start();
-
-        foreach (var (_, mediaSession) in _mediaManager.CurrentMediaSessions)
-        {
-            _mediaSessions.Add(mediaSession);
-        }
-    }
-
-    private void MediaManagerOnOnFocusedSessionChanged(MediaSession mediaSession)
-    {
-        if (_currentSession != null)
-        {
-            _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
-        }
-        _mediaSessions.Add(mediaSession);
-        _currentSession = mediaSession;
-        _mediaManager.OnAnyPlaybackStateChanged += MediaSession_OnPlaybackStateChanged;
-        MediaSession_OnPlaybackStateChanged(mediaSession, mediaSession.ControlSession.GetPlaybackInfo());
+        DataModel.MediaSessions = _mediaWatcher.MediaSessions;
+        DataModel.ArtMediaSessions = _mediaWatcher.AlbumArtSessions;
     }
 
     public override void Disable()
     {
-        _albumArtSessions.Clear();
-        _mediaSessions.Clear();
-
-        if (_currentSession != null)
-        {
-            _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
-        }
-
-        _mediaManager.OnAnyMediaPropertyChanged -= MediaManager_OnAnyMediaPropertyChanged;
-        _mediaManager.OnFocusedSessionChanged -= MediaManagerOnOnFocusedSessionChanged;
-        _mediaManager.OnAnySessionClosed -= MediaManager_OnAnySessionClosed;
-        _mediaManager.OnAnySessionOpened -= MediaManager_OnSessionOpened;
-        _mediaManager.Dispose();
-        _mediaManager = null;
+        //unused
     }
 
     public override void Update(double deltaTime) {}
 
     public override void ModuleActivated(bool isOverride)
     {
-        DataModel.MediaSessions = _mediaSessions;
-        DataModel.ArtMediaSessions = _albumArtSessions;
+        _mediaWatcher.FocusedMediaChanged += MediaWatcherOnFocusedMediaChanged;
+        _mediaWatcher.ArtStateChanged += MediaWatcherOnArtStateChanged;
+        _mediaWatcher.StartListening().Wait();
     }
     public override void ModuleDeactivated(bool isOverride) {
-        //unused
+        _mediaWatcher.StopListening();
+        _mediaWatcher.FocusedMediaChanged -= MediaWatcherOnFocusedMediaChanged;
+        _mediaWatcher.ArtStateChanged -= MediaWatcherOnArtStateChanged;
     }
 
-    private void MediaManager_OnSessionOpened(MediaSession mediaSession)
+    private void MediaWatcherOnFocusedMediaChanged(object? sender, FocusedMediaChangedEventArgs e)
     {
-        DataModel.HasMedia = true;
-        _mediaSessions.Add(mediaSession);
+        var mediaSession = e.MediaSession;
+        UpdateButtons(mediaSession, e.PlaybackInfo);
     }
 
-    private void MediaManager_OnAnySessionClosed(MediaSession mediaSession)
-    {
-        _currentSession.OnPlaybackStateChanged -= MediaSession_OnPlaybackStateChanged;
-        _mediaSessions.Remove(mediaSession);
-        _albumArtSessions.Remove(mediaSession);
-        if (_currentSession.Id == mediaSession.Id)
-        {
-            _currentSession = _mediaManager.GetFocusedSession();
-        }
-        UpdateButtons(_currentSession);
-        UpdateArtState();
-    }
-
-    private async void MediaManager_OnAnyMediaPropertyChanged(MediaSession mediaSession,
-        GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
-    {
-        if (mediaSession.ControlSession == null)
-        {
-            MediaManager_OnAnySessionClosed(mediaSession);
-            return;
-        }
-        try
-        {
-            if (mediaProperties.Thumbnail is null)
-            {
-                _albumArtSessions.Remove(mediaSession);
-                return;
-            }
-
-            DataModel.ArtColors = await ReadMediaColors(mediaProperties);
-            _albumArtSessions.Add(mediaSession);
-        }
-        catch
-        {
-            _albumArtSessions.Remove(mediaSession);
-        }
-        finally
-        {
-            UpdateArtState();
-            DataModel.MediaChanged.Trigger(new MediaChangedEventArgs
-            {
-                SessionId = mediaSession.Id,
-                Title = mediaProperties.Title,
-                Artist = mediaProperties.Artist,
-                MediaType = mediaProperties.PlaybackType ?? MediaPlaybackType.Unknown,
-                HasArt = mediaProperties.Thumbnail is not null
-            });
-        }
-    }
-
-    private void MediaSession_OnPlaybackStateChanged(MediaSession mediaSession,
-        GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo)
-    {
-        if (playbackInfo == null || playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed)
-        {
-            MediaManager_OnAnySessionClosed(mediaSession);
-            return;
-        }
-
-        _mediaSessions.Add(mediaSession);   // Some app like chrome use same id for different tabs.
-                                            // So, closing the tab may cause all chroma sessions to be removed. This re-adds them
-
-        UpdateButtons(mediaSession);
-        UpdateArtState();
-    }
-
-    private void UpdateButtons(MediaSession mediaSession)
+    private void UpdateButtons(MediaSession? mediaSession,
+        GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
     {
         if (mediaSession == null)
         {
@@ -171,30 +66,66 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         }
         DataModel.HasMedia = true;
 
-        var playbackInfo = mediaSession.ControlSession.GetPlaybackInfo();
+        if (FocusedUpdate)
+        {
+            FocusedModelUpdate(mediaSession, playbackInfo);
+        }
+        else
+        {
+            AnySessionModelUpdate(mediaSession, playbackInfo);
+        }
+    }
+
+    private void FocusedModelUpdate(MediaSession mediaSession,
+        GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
+    {
+        if (playbackInfo == null)
+        {
+            playbackInfo = mediaSession.ControlSession.GetPlaybackInfo();
+        }
+
         var playbackControls = playbackInfo.Controls;
+
         DataModel.HasNextMedia = playbackControls.IsNextEnabled;
         DataModel.HasPreviousMedia = playbackControls.IsPreviousEnabled;
-        DataModel.MediaPlaying = playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+        DataModel.MediaPlaying =
+            playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
         DataModel.MediaState = playbackInfo.PlaybackStatus;
         DataModel.SessionName = mediaSession.Id;
     }
 
-    private void UpdateArtState()
+    private void AnySessionModelUpdate(MediaSession focusedMediaSession,
+        GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
     {
-        DataModel.HasArt = _albumArtSessions.Any();
+        DataModel.HasPreviousMedia = false;
+        DataModel.MediaPlaying = false;
+        DataModel.HasNextMedia = false;
+        DataModel.MediaState = playbackInfo?.PlaybackStatus ?? GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed;
+        DataModel.SessionName = focusedMediaSession.Id;
+        foreach (var mediaSession in _mediaWatcher.MediaSessions)
+        {
+            var controls = mediaSession.ControlSession.GetPlaybackInfo().Controls;
+            DataModel.HasPreviousMedia |= controls.IsPreviousEnabled;
+            DataModel.MediaPlaying |= !controls.IsPlayEnabled;
+            DataModel.HasNextMedia |= controls.IsNextEnabled;
+        }
     }
 
-    private sealed class MediaSessionComparer : IEqualityComparer<MediaSession>
+    private async void MediaWatcherOnArtStateChanged(object? sender, ArtStateChangedEventArgs e)
     {
-        public bool Equals(MediaSession x, MediaSession y)
+        if (e.Thumbnail != null)
         {
-            return x?.Id == y?.Id;
+            DataModel.ArtColors = await ReadMediaColors(e.Thumbnail);
         }
-
-        public int GetHashCode(MediaSession obj)
+        else
         {
-            return obj.Id.GetHashCode();
+            var mediaSession = _mediaWatcher.AlbumArtSessions.LastOrDefault();
+            if (mediaSession!= null)
+            {
+                var mediaProperties = mediaSession.ControlSession.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
+                DataModel.ArtColors = await ReadMediaColors(mediaProperties);
+            }
         }
+        DataModel.HasArt = _mediaWatcher.AlbumArtSessions.Any();
     }
 }

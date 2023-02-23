@@ -7,37 +7,64 @@ namespace Artemis.MediaInfo.Utils;
 
 public class RegistryChangedEventArgs : EventArgs
 {
-    public readonly object Data;
+    public readonly object? Data;
 
-    public RegistryChangedEventArgs(object data)
+    public RegistryChangedEventArgs(object? data)
     {
         Data = data;
     }
 }
 
+public enum WatchedRegistry
+{
+    CurrentUser,
+    LocalMachine,
+}
+
 public sealed class RegistryWatcher : IDisposable
 {
-    public event EventHandler<RegistryChangedEventArgs> RegistryChanged;
+    public event EventHandler<RegistryChangedEventArgs>? RegistryChanged;
     
+    private readonly RegistryKey _registry;
     private readonly string _key;
     private readonly string _value;
-    private ManagementEventWatcher _eventWatcher;
+    private ManagementEventWatcher? _eventWatcher;
+    private readonly WqlEventQuery _query;
 
-    public RegistryWatcher(string key, string value)
+    public RegistryWatcher(WatchedRegistry watchedRegistry, string key, string value)
     {
         _key = key;
         _value = value;
+        
+        var currentUser = WindowsIdentity.GetCurrent();
+        var keyPath = _key.Replace("\\", "\\\\");
+        var queryString = watchedRegistry switch
+        {
+            WatchedRegistry.LocalMachine =>
+                $"SELECT * FROM RegistryValueChangeEvent " +
+                $"WHERE Hive='HKEY_LOCAL_MACHINE' AND " +
+                $"KeyPath='{keyPath}' AND " +
+                $"ValueName='{_value}'",
+            WatchedRegistry.CurrentUser =>
+                "SELECT * FROM RegistryValueChangeEvent " +
+                "WHERE Hive='HKEY_USERS' AND " +
+                $"KeyPath='{currentUser.User!.Value}\\\\{keyPath}' AND " +
+                $"ValueName='{_value}'",
+            _ => throw new ArgumentOutOfRangeException(nameof(watchedRegistry), watchedRegistry, "This part of registry is not implemented")
+        };
+        _query = new WqlEventQuery(queryString);
+        _registry = watchedRegistry switch
+        {
+            WatchedRegistry.LocalMachine => Registry.LocalMachine,
+            WatchedRegistry.CurrentUser => Registry.CurrentUser,
+            _ => throw new ArgumentException("This part of registry is not implemented")
+        };
     }
 
     public void StartWatching()
     {
-        var currentUser = WindowsIdentity.GetCurrent();
         ManagementScope scope = new ManagementScope("\\\\.\\root\\default");
-        var queryString = string.Format(
-            "SELECT * FROM RegistryValueChangeEvent WHERE Hive='HKEY_USERS' AND KeyPath='{0}\\\\{1}' AND ValueName='{2}'",
-            currentUser.User.Value, _key.Replace("\\", "\\\\"), _value);
-        var query = new WqlEventQuery(queryString);
-        _eventWatcher = new ManagementEventWatcher(scope, query);
+        _eventWatcher = new ManagementEventWatcher(scope, _query);
         _eventWatcher.EventArrived += KeyWatcherOnEventArrived;
         _eventWatcher.Start();
         
@@ -46,6 +73,10 @@ public sealed class RegistryWatcher : IDisposable
 
     public void StopWatching()
     {
+        if (_eventWatcher == null)
+        {
+            return;
+        }
         _eventWatcher.EventArrived -= KeyWatcherOnEventArrived;
         _eventWatcher.Stop();
         _eventWatcher.Dispose();
@@ -59,7 +90,7 @@ public sealed class RegistryWatcher : IDisposable
 
     private void SendData()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(_key);
+        using var key = _registry.OpenSubKey(_key);
         var data = key?.GetValue(_value);
         RegistryChanged?.Invoke(this, new RegistryChangedEventArgs(data));
     }

@@ -9,11 +9,11 @@ namespace Artemis.MediaInfo;
 
 public class WindowsInfoModule : Module<WindowsInfoDataModel>
 {
-    private readonly RegistryWatcher _nightLightStateWatcher = new(
+    private readonly RegistryWatcher _nightLightStateWatcher = new(WatchedRegistry.CurrentUser,
         @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\" +
         @"Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.bluelightreductionstate\\" +
         @"windows.data.bluelightreduction.bluelightreductionstate", "Data");
-    private readonly RegistryWatcher _accentColorWatcher = new(
+    private readonly RegistryWatcher _accentColorWatcher = new(WatchedRegistry.CurrentUser,
         @"SOFTWARE\\Microsoft\\Windows\\DWM", "AccentColor");
 
     public override void Enable()
@@ -59,7 +59,7 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         };
     }
 
-    private void UpdateNightLight(object sender, RegistryChangedEventArgs registryChangedEventArgs)
+    private void UpdateNightLight(object? sender, RegistryChangedEventArgs registryChangedEventArgs)
     {
         var data = registryChangedEventArgs.Data;
         if (data is null)
@@ -72,7 +72,7 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         DataModel.NightLightsEnabled = byteData.Length > 24 && byteData[23] == 0x10 && byteData[24] == 0x00;
     }
 
-    private void UpdateAccentColor(object sender, RegistryChangedEventArgs registryChangedEventArgs)
+    private void UpdateAccentColor(object? sender, RegistryChangedEventArgs registryChangedEventArgs)
     {
         var data = registryChangedEventArgs.Data;
         switch (data)

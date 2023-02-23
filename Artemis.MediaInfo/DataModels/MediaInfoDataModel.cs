@@ -1,7 +1,5 @@
 ﻿using System.Collections.Generic;
-using Windows.Media;
 using Windows.Media.Control;
-using Artemis.Core;
 using Artemis.Core.ColorScience;
 using Artemis.Core.Modules;
 using WindowsMediaController;
@@ -36,16 +34,6 @@ public class MediaInfoDataModel : DataModel
         
     public string SessionName { get; set; }
 
-    public DataModelEvent<MediaChangedEventArgs> MediaChanged { get; } = new();
     public ISet<MediaManager.MediaSession> MediaSessions { get; set; }
     public ISet<MediaManager.MediaSession> ArtMediaSessions { get; set; }
-}
-
-public class MediaChangedEventArgs : DataModelEventArgs
-{
-    public string SessionId { get; set; }
-    public string Title { get; set; }
-    public string Artist { get; set; }
-    public MediaPlaybackType MediaType { get; set; }
-    public bool HasArt { get; set; }
 }
