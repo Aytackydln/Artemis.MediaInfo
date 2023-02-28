@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Windows.Media.Control;
 using WindowsMediaController;
@@ -75,7 +76,11 @@ public class MediaWatcher
 
     private void MediaManager_OnAnySessionClosed(MediaSession mediaSession)
     {
-        AlbumArtSessions.Remove(mediaSession);
+        var artSessionRemoved = AlbumArtSessions.Remove(mediaSession);
+        if (artSessionRemoved)
+        {
+            NotifyNextMediaSession();
+        }
         MediaSessions.Remove(mediaSession);
         _mediaManager.ForceUpdate();
     }
@@ -93,17 +98,31 @@ public class MediaWatcher
             if (mediaProperties.Thumbnail is null)
             {
                 AlbumArtSessions.Remove(mediaSession);
-                ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(mediaSession, null));
+                NotifyNextMediaSession();
                 return;
             }
 
             AlbumArtSessions.Add(mediaSession);
-            ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(mediaSession, mediaProperties.Thumbnail));
+            ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(mediaProperties.Thumbnail));
         }
         catch
         {
             AlbumArtSessions.Remove(mediaSession);
-            ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(mediaSession, null));
+            NotifyNextMediaSession();
+        }
+    }
+
+    private void NotifyNextMediaSession()
+    {
+        var nextArtSession = AlbumArtSessions.LastOrDefault();
+        if (nextArtSession != null)
+        {
+            var mediaProperties = nextArtSession.ControlSession.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
+            ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(mediaProperties.Thumbnail));
+        }
+        else
+        {
+            ArtStateChanged?.Invoke(this, new ArtStateChangedEventArgs(null));
         }
     }
 

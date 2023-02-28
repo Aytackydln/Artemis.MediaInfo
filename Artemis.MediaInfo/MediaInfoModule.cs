@@ -115,17 +115,12 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
     {
         if (e.Thumbnail != null)
         {
+            DataModel.HasArt = true;
             DataModel.ArtColors = await ReadMediaColors(e.Thumbnail);
         }
         else
         {
-            var mediaSession = _mediaWatcher.AlbumArtSessions.LastOrDefault();
-            if (mediaSession!= null)
-            {
-                var mediaProperties = mediaSession.ControlSession.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
-                DataModel.ArtColors = await ReadMediaColors(mediaProperties);
-            }
+            DataModel.HasArt = false;
         }
-        DataModel.HasArt = _mediaWatcher.AlbumArtSessions.Any();
     }
 }

@@ -17,12 +17,10 @@ public class MediaAddedEventArgs : EventArgs
 
 public class ArtStateChangedEventArgs : EventArgs
 {
-    public MediaManager.MediaSession MediaSession { get; }
     public IRandomAccessStreamReference? Thumbnail { get; }
 
-    public ArtStateChangedEventArgs(MediaManager.MediaSession mediaSession, IRandomAccessStreamReference? thumbnail)
+    public ArtStateChangedEventArgs(IRandomAccessStreamReference? thumbnail)
     {
-        MediaSession = mediaSession;
         Thumbnail = thumbnail;
     }
 }

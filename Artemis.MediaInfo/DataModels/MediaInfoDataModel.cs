@@ -31,9 +31,9 @@ public class MediaInfoDataModel : DataModel
     public bool HasArt { get; set; }
 
     public ColorSwatch ArtColors { get; set; }
-        
-    public string SessionName { get; set; }
 
-    public ISet<MediaManager.MediaSession> MediaSessions { get; set; }
-    public ISet<MediaManager.MediaSession> ArtMediaSessions { get; set; }
+    public string SessionName { get; set; } = "";
+
+    public ISet<MediaManager.MediaSession> MediaSessions { get; set; } = new HashSet<MediaManager.MediaSession>();
+    public ISet<MediaManager.MediaSession> ArtMediaSessions { get; set; } = new HashSet<MediaManager.MediaSession>();
 }

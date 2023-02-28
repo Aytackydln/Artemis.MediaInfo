@@ -63,7 +63,7 @@ public sealed class RegistryWatcher : IDisposable
 
     public void StartWatching()
     {
-        ManagementScope scope = new ManagementScope("\\\\.\\root\\default");
+        var scope = new ManagementScope("\\\\.\\root\\default");
         _eventWatcher = new ManagementEventWatcher(scope, _query);
         _eventWatcher.EventArrived += KeyWatcherOnEventArrived;
         _eventWatcher.Start();
