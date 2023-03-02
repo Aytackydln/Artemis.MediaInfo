@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Artemis.Core.Modules;
 using Artemis.MediaInfo.DataModels;
+using Artemis.MediaInfo.MonitorState;
 using Artemis.MediaInfo.Utils;
 using Microsoft.Win32;
 using SkiaSharp;
@@ -24,7 +26,8 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         _accentColorWatcher.RegistryChanged += UpdateAccentColor;
         _accentColorWatcher.StartWatching();
 
-        StartListenLockState();
+        SystemEvents.SessionSwitch += OnSessionSwitch;
+        PowerManager.IsMonitorOnChanged += PowerManagerOnIsMonitorOnChanged;
     }
 
     public override void Disable()
@@ -36,6 +39,7 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         _accentColorWatcher.RegistryChanged -= UpdateAccentColor;
         
         SystemEvents.SessionSwitch -= OnSessionSwitch;
+        PowerManager.IsMonitorOnChanged -= PowerManagerOnIsMonitorOnChanged;
     }
 
     public override void Update(double deltaTime)
@@ -43,11 +47,6 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     }
 
     public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
-
-    private void StartListenLockState()
-    {
-        SystemEvents.SessionSwitch += OnSessionSwitch;
-    }
 
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
     {
@@ -84,6 +83,11 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
                 DataModel.AccentColor = ParseDWordColor(accentColorDword);
                 break;
         }
+    }
+
+    private void PowerManagerOnIsMonitorOnChanged(object? sender, EventArgs e)
+    {
+        DataModel.MonitorsOff = !PowerManager.IsMonitorOn;
     }
 
     private static SKColor ParseDWordColor(int color)
