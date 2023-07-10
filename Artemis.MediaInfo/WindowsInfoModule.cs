@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Artemis.Core.Modules;
 using Artemis.MediaInfo.DataModels;
 using Artemis.MediaInfo.Utils;
@@ -13,6 +14,10 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\" +
         @"Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.bluelightreductionstate\\" +
         @"windows.data.bluelightreduction.bluelightreductionstate", "Data");
+    private readonly RegistryWatcher _nightLightSettingsWatcher = new(WatchedRegistry.CurrentUser,
+        @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\" +
+        @"Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.settings\\" +
+        @"windows.data.bluelightreduction.settings", "Data");
     private readonly RegistryWatcher _accentColorWatcher = new(WatchedRegistry.CurrentUser,
         @"SOFTWARE\\Microsoft\\Windows\\DWM", "AccentColor");
 
@@ -20,6 +25,9 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     {
         _nightLightStateWatcher.RegistryChanged += UpdateNightLight;
         _nightLightStateWatcher.StartWatching();
+        
+        _nightLightSettingsWatcher.RegistryChanged += NightLightSettingsWatcherOnRegistryChanged;
+        _nightLightSettingsWatcher.StartWatching();
 
         _accentColorWatcher.RegistryChanged += UpdateAccentColor;
         _accentColorWatcher.StartWatching();
@@ -86,6 +94,19 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         }
     }
 
+    private void NightLightSettingsWatcherOnRegistryChanged(object? sender, RegistryChangedEventArgs e)
+    {
+        var data = e.Data;
+        if (data is null)
+        {
+            DataModel.NightLightsStrength = 0;
+            return;
+        }
+
+        var byteData = (byte[])data;
+        DataModel.NightLightsStrength = ParseNightLightStrength(byteData);
+    }
+
     private static SKColor ParseDWordColor(int color)
     {
         var a = (byte)((color >> 24) & 0xFF);
@@ -94,5 +115,13 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         var r = (byte)((color >> 0) & 0xFF);
 
         return new SKColor(r, g, b, a);
+    }
+
+    private static double ParseNightLightStrength(byte[] data)
+    {
+        const int min = 4832;
+        const int max = 26056;
+        var value = BitConverter.ToInt16(data, 35);
+        return 1 - (double)(value - min) / (max - min);
     }
 }

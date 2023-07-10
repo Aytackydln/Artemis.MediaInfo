@@ -1,13 +1,11 @@
-﻿using System;
-using Artemis.Core;
+﻿using Artemis.Core;
 using Artemis.Core.Modules;
 using System.Collections.Generic;
-using System.Linq;
 using Artemis.MediaInfo.DataModels;
 using Windows.Media.Control;
 using Artemis.MediaInfo.MediaWatch;
 using static WindowsMediaController.MediaManager;
-using static Artemis.MediaInfo.MediaInfoHelper;
+using static Artemis.MediaInfo.Utils.MediaInfoHelper;
 
 namespace Artemis.MediaInfo;
 

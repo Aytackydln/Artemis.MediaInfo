@@ -8,6 +8,9 @@ using static WindowsMediaController.MediaManager;
 
 namespace Artemis.MediaInfo.MediaWatch;
 
+/// <summary>
+/// Wrapping class that it's only dependency is Dubya.WindowsMediaController
+/// </summary>
 public class MediaWatcher
 {
     private readonly MediaManager _mediaManager = new();
@@ -65,7 +68,7 @@ public class MediaWatcher
             _currentSession = mediaSession;
             _currentSession.OnPlaybackStateChanged += MediaSession_OnPlaybackStateChanged;
         }
-        FocusedMediaChanged?.Invoke(this, new FocusedMediaChangedEventArgs(mediaSession, null));
+        FocusedMediaChanged?.Invoke(this, new FocusedMediaChangedEventArgs(mediaSession, mediaSession?.ControlSession.GetPlaybackInfo()));
     }
 
     private void MediaManager_OnSessionOpened(MediaSession mediaSession)

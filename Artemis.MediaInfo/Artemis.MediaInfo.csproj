@@ -1,28 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net6.0-windows10.0.17763.0</TargetFramework>
+        <TargetFramework>net7.0-windows10.0.17763.0</TargetFramework>
         <Platforms>x64</Platforms>
         <PlatformTarget>x64</PlatformTarget>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <Nullable>enable</Nullable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Windows.Compatibility" Version="6.0.0" />
-        <PackageReference Include="ArtemisRGB.UI.Shared" IncludeAssets="compile;build;buildTransitive" Version="1.2023.111.4" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-
-        <PackageReference Update="@(PackageReference)" IncludeAssets="compile;build" />
-
-        <PackageReference Include="Dubya.WindowsMediaController" Version="2.4.0" IncludeAssets="compile;lib:runtime" />
-        <Reference Include="Artemis.Core">
-            <HintPath>..\..\Artemis\src\Artemis.Core\bin\net6.0\Artemis.Core.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
+        <PackageReference Include="ArtemisRGB.UI.Shared" IncludeAssets="compile" Version="1.2023.522.4" />
+        <PackageReference Include="Microsoft.Windows.Compatibility" Version="7.0.4" />
+        <PackageReference Include="Dubya.WindowsMediaController" Version="2.5.0" />
+        <PackageReference Include="System.Windows.Extensions" IncludeAssets="native" Version="7.0.0" />
     </ItemGroup>
 
     <ItemGroup>
         <Content Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
-        <PackageReference Include="ArtemisRGB.Plugins.BuildTask" Version="1.1.0" />
+        <PackageReference Include="ArtemisRGB.Plugins.BuildTask" Version="2.0.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 </Project>

@@ -1,19 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Windows.Media.Control;
 using Windows.Storage.Streams;
 using Artemis.Core.ColorScience;
 using SkiaSharp;
 
-namespace Artemis.MediaInfo;
+namespace Artemis.MediaInfo.Utils;
 
 public static class MediaInfoHelper
 {
-    internal static async Task<ColorSwatch> ReadMediaColors(GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
-    {
-        return await ReadMediaColors(mediaProperties.Thumbnail);
-    }
-
     internal static async Task<ColorSwatch> ReadMediaColors(IRandomAccessStreamReference thumbnail)
     {
         var imageStream = await thumbnail.OpenReadAsync();
