@@ -32,13 +32,16 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         _accentColorWatcher.RegistryChanged += UpdateAccentColor;
         _accentColorWatcher.StartWatching();
 
-        StartListenLockState();
+        SystemEvents.SessionSwitch += OnSessionSwitch;
     }
 
     public override void Disable()
     {
         _nightLightStateWatcher.StopWatching();
         _nightLightStateWatcher.RegistryChanged -= UpdateNightLight;
+
+        _nightLightSettingsWatcher.RegistryChanged -= NightLightSettingsWatcherOnRegistryChanged;
+        _nightLightSettingsWatcher.StopWatching();
 
         _accentColorWatcher.StopWatching();
         _accentColorWatcher.RegistryChanged -= UpdateAccentColor;
@@ -51,11 +54,6 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     }
 
     public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
-
-    private void StartListenLockState()
-    {
-        SystemEvents.SessionSwitch += OnSessionSwitch;
-    }
 
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
     {
@@ -121,6 +119,10 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     {
         const int min = 4832;
         const int max = 26056;
+        if (data.Length < 37)
+        {
+            return 0;
+        }
         var value = BitConverter.ToInt16(data, 35);
         return 1 - (double)(value - min) / (max - min);
     }
