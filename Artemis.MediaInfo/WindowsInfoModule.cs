@@ -33,6 +33,7 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
         _accentColorWatcher.StartWatching();
 
         SystemEvents.SessionSwitch += OnSessionSwitch;
+        DataModel.Username = GetUsername();
     }
 
     public override void Disable()
@@ -63,6 +64,19 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
             SessionSwitchReason.SessionUnlock => false,
             _ => DataModel.SessionLocked
         };
+        DataModel.Username = e.Reason switch
+        {
+            SessionSwitchReason.SessionUnlock => GetUsername(),
+            SessionSwitchReason.SessionLogon => GetUsername(),
+            SessionSwitchReason.SessionLock => string.Empty,
+            SessionSwitchReason.SessionLogoff => string.Empty,
+            _ => DataModel.Username
+        };
+    }
+
+    private static string GetUsername()
+    {
+        return System.Security.Principal.WindowsIdentity.GetCurrent().Name.Split("\\")[1];
     }
 
     private void UpdateNightLight(object? sender, RegistryChangedEventArgs registryChangedEventArgs)

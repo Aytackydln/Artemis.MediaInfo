@@ -16,4 +16,7 @@ public class WindowsInfoDataModel : DataModel
     
     [DataModelProperty(Name = "Desktop Accent Color")]
     public SKColor AccentColor { get; set; } = SKColor.Empty;
+
+    [DataModelProperty(Name = "Session User Name")]
+    public string Username { get; set; } = string.Empty;
 }

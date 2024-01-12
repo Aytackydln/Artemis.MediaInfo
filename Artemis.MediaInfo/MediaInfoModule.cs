@@ -1,6 +1,7 @@
 ﻿using Artemis.Core;
 using Artemis.Core.Modules;
 using System.Collections.Generic;
+using Windows.Media;
 using Artemis.MediaInfo.DataModels;
 using Windows.Media.Control;
 using Artemis.MediaInfo.MediaWatch;
@@ -59,6 +60,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
             DataModel.HasPreviousMedia = false;
             DataModel.MediaPlaying = false;
             DataModel.MediaState = GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed;
+            DataModel.MediaType = MediaPlaybackType.Unknown;
             DataModel.SessionName = "";
             return;
         }
@@ -89,6 +91,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         DataModel.MediaPlaying =
             playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
         DataModel.MediaState = playbackInfo.PlaybackStatus;
+        DataModel.MediaType = playbackInfo.PlaybackType ?? MediaPlaybackType.Unknown;
         DataModel.SessionName = mediaSession.Id;
     }
 
@@ -99,6 +102,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         DataModel.MediaPlaying = false;
         DataModel.HasNextMedia = false;
         DataModel.MediaState = playbackInfo?.PlaybackStatus ?? GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed;
+        DataModel.MediaType = playbackInfo?.PlaybackType ?? MediaPlaybackType.Unknown;
         DataModel.SessionName = focusedMediaSession.Id;
         foreach (var mediaSession in _mediaWatcher.MediaSessions)
         {
