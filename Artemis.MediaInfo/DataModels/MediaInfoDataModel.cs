@@ -3,10 +3,12 @@ using Windows.Media;
 using Windows.Media.Control;
 using Artemis.Core.ColorScience;
 using Artemis.Core.Modules;
+using JetBrains.Annotations;
 using WindowsMediaController;
 
 namespace Artemis.MediaInfo.DataModels;
 
+[PublicAPI]
 public class MediaInfoDataModel : DataModel
 {
     [DataModelProperty(Name = "A media is being reported")]

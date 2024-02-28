@@ -10,16 +10,17 @@ namespace Artemis.MediaInfo;
 
 public class WindowsInfoModule : Module<WindowsInfoDataModel>
 {
+    public override List<IModuleActivationRequirement> ActivationRequirements { get; } = [];
+
     private readonly RegistryWatcher _nightLightStateWatcher = new(WatchedRegistry.CurrentUser,
-        @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\" +
-        @"Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.bluelightreductionstate\\" +
-        @"windows.data.bluelightreduction.bluelightreductionstate", "Data");
+        @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.bluelightreductionstate\\windows.data.bluelightreduction.bluelightreductionstate",
+        "Data");
     private readonly RegistryWatcher _nightLightSettingsWatcher = new(WatchedRegistry.CurrentUser,
-        @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\" +
-        @"Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.settings\\" +
-        @"windows.data.bluelightreduction.settings", "Data");
+        @"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CloudStore\\Store\\DefaultAccount\\Current\\default$windows.data.bluelightreduction.settings\\windows.data.bluelightreduction.settings",
+        "Data");
     private readonly RegistryWatcher _accentColorWatcher = new(WatchedRegistry.CurrentUser,
-        @"SOFTWARE\\Microsoft\\Windows\\DWM", "AccentColor");
+        @"SOFTWARE\\Microsoft\\Windows\\DWM",
+        "AccentColor");
 
     public override void Enable()
     {
@@ -54,8 +55,6 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     {
     }
 
-    public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
-
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
     {
         DataModel.SessionLocked = e.Reason switch
@@ -82,13 +81,12 @@ public class WindowsInfoModule : Module<WindowsInfoDataModel>
     private void UpdateNightLight(object? sender, RegistryChangedEventArgs registryChangedEventArgs)
     {
         var data = registryChangedEventArgs.Data;
-        if (data is null)
+        if (data is not byte[] byteData)
         {
             DataModel.NightLightsEnabled = false;
             return;
         }
 
-        var byteData = (byte[])data;
         DataModel.NightLightsEnabled = byteData.Length > 24 && byteData[23] == 0x10 && byteData[24] == 0x00;
     }
 

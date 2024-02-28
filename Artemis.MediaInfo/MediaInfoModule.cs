@@ -15,7 +15,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
 {
     private static readonly bool FocusedUpdate = false;   //because window's focus events don't work well for everyone :/
 
-    public override List<IModuleActivationRequirement> ActivationRequirements { get; } = new();
+    public override List<IModuleActivationRequirement> ActivationRequirements { get; } = [];
 
     private readonly MediaWatcher _mediaWatcher = new();
 
@@ -76,8 +76,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         }
     }
 
-    private void FocusedModelUpdate(MediaSession mediaSession,
-        GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
+    private void FocusedModelUpdate(MediaSession mediaSession, GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
     {
         if (playbackInfo == null)
         {
@@ -95,8 +94,7 @@ public class MediaInfoModule : Module<MediaInfoDataModel>
         DataModel.SessionName = mediaSession.Id;
     }
 
-    private void AnySessionModelUpdate(MediaSession focusedMediaSession,
-        GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
+    private void AnySessionModelUpdate(MediaSession focusedMediaSession, GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo)
     {
         DataModel.HasPreviousMedia = false;
         DataModel.MediaPlaying = false;

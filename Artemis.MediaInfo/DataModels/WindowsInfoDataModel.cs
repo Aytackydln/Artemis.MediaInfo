@@ -1,8 +1,10 @@
 ﻿using Artemis.Core.Modules;
+using JetBrains.Annotations;
 using SkiaSharp;
 
 namespace Artemis.MediaInfo.DataModels;
 
+[PublicAPI]
 public class WindowsInfoDataModel : DataModel
 {
     [DataModelProperty(Name = "Session Is Locked")]
