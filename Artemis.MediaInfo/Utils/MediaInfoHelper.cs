@@ -19,8 +19,8 @@ public static class MediaInfoHelper
             reader.ReadBytes(fileBytes);
         }
 
-        using SKBitmap bitmap = SKBitmap.Decode(fileBytes);
-        SKColor[] skClrs = ColorQuantizer.Quantize(bitmap.Pixels, 256);
+        using var bitmap = SKBitmap.Decode(fileBytes);
+        var skClrs = ColorQuantizer.Quantize(bitmap.Pixels, 256);
         return ColorQuantizer.FindAllColorVariations(skClrs, true);
     }
 }

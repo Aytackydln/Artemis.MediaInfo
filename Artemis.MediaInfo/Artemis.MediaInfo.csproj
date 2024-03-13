@@ -1,17 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+        <TargetFramework>net7.0-windows10.0.17763.0</TargetFramework>
         <Platforms>x64</Platforms>
         <PlatformTarget>x64</PlatformTarget>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="ArtemisRGB.UI.Shared" IncludeAssets="compile" Version="1.2024.228.2" />
+        <PackageReference Include="ArtemisRGB.UI.Shared" IncludeAssets="compile" Version="1.2023.522.4" />
+        <PackageReference Include="Microsoft.Windows.Compatibility" Version="7.0.4" />
         <PackageReference Include="Dubya.WindowsMediaController" Version="2.5.0" />
-        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="8.0.0" />
-        <PackageReference Include="System.Management" Version="8.0.0" />
+        <PackageReference Include="System.Windows.Extensions" IncludeAssets="native" Version="7.0.0" />
     </ItemGroup>
 
     <ItemGroup>

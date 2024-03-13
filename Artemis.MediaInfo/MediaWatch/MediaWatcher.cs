@@ -13,6 +13,19 @@ namespace Artemis.MediaInfo.MediaWatch;
 /// </summary>
 public class MediaWatcher
 {
+    private sealed class MediaSessionComparer : IEqualityComparer<MediaSession>
+    {
+        public bool Equals(MediaSession? x, MediaSession? y)
+        {
+            return x?.Id == y?.Id;
+        }
+
+        public int GetHashCode(MediaSession obj)
+        {
+            return obj.Id.GetHashCode();
+        }
+    }
+    
     private readonly MediaManager _mediaManager = new();
 
     public ISet<MediaSession> MediaSessions { get; } = new HashSet<MediaSession>(new MediaSessionComparer());
@@ -145,18 +158,5 @@ public class MediaWatcher
         MediaSessions.Add(mediaSession);
 
         FocusedMediaChanged?.Invoke(this, new FocusedMediaChangedEventArgs(mediaSession, playbackInfo));
-    }
-
-    private sealed class MediaSessionComparer : IEqualityComparer<MediaSession>
-    {
-        public bool Equals(MediaSession? x, MediaSession? y)
-        {
-            return x?.Id == y?.Id;
-        }
-
-        public int GetHashCode(MediaSession obj)
-        {
-            return obj.Id.GetHashCode();
-        }
     }
 }

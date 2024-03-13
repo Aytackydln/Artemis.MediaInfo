@@ -24,8 +24,8 @@ public class MediaInfoDataModel : DataModel
     public bool HasPreviousMedia { get; set; }
         
     [DataModelProperty(Name = "Latest updated media state",
-        Description = " Note that there may be other media sessions. " +
-                      "Other values become true when any of the sessions meet the conditions.")]
+        Description = " Note that there may be other media sessions.\n" +
+                      "May become true when any of the sessions meet the condition.")]
     public GlobalSystemMediaTransportControlsSessionPlaybackStatus MediaState { get; set; }
 
     [DataModelProperty(Name = "Media type")]
